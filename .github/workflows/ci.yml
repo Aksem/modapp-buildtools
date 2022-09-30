@@ -139,6 +139,8 @@ jobs:
 
       - name: Archive
         run: |
+          wget https://github.com/Aksem/modapp-cicdtools/releases/download/v0.1.8/cicdtools_Linux.zip
+          unzip cicdtools_Linux.zip
           chmod +x ./cicdtools_Linux/cicdtools
           ./cicdtools_Linux/cicdtools archive $PWD/${{ env.APP_NAME }}_Linux ${{ env.APP_NAME }}_Linux.zip
           ./cicdtools_Linux/cicdtools archive $PWD/${{ env.APP_NAME }}_macOS ${{ env.APP_NAME }}_macOS.zip
