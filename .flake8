@@ -1,0 +1,6 @@
+[flake8]
+max-line-length = 99
+exclude=tests
+# don't check arguments docs in CLI, because docstring is showed in CLI
+per-file-ignores =
+    modapp_buildtools/cli.py:DAR101

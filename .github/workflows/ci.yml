@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    types: [opened, reopened]
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PACKAGE_NAME: modapp_buildtools
+  MAIN_MODULE: cli
+  APP_NAME: buildtools
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        os: [ubuntu-20.04, macos-11, windows-2019]
+        python-version: ["3.10"]
+        include:
+          - os: ubuntu-20.04
+            name: Linux
+            nuitkaArgs: ""
+            exeExtension: ""
+          - os: macos-11
+            name: macOS
+            nuitkaArgs: ""
+            exeExtension: ""
+          - os: windows-2019
+            name: Windows
+            nuitkaArgs: "--mingw64"
+            exeExtension: ".exe"
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: msys
+        if: ${{ matrix.name == 'Windows' }}
+        uses: msys2/setup-msys2@v2
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+      
+      - name: Cache Nuitka
+        uses: actions/cache@v3
+        with:
+          path: ${{ github.workspace }}/.nuitka_cache
+          key: ${{ runner.os }}-nuitka
+
+      - name: Install poetry
+        run: pipx install poetry==1.2.0rc2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'poetry'
+
+      - name: Install dependencies
+        run: |
+          poetry install --verbose
+        shell: bash
+      
+      # use action instead of wget or curl to support Windows with the same action
+      - uses: suisei-cn/actions-download-file@v1.0.1
+        name: Download cicdtools
+        with:
+          url: "https://github.com/Aksem/modapp-cicdtools/releases/download/v0.1.8/cicdtools_${{ matrix.name }}.zip"
+          target: ${{ github.workspace }}
+      
+      - name: Install cicdtools
+        run: |
+          unzip cicdtools_${{ matrix.name }}.zip
+          chmod +x cicdtools_${{ matrix.name }}/cicdtools${{ matrix.exeExtension }}
+        shell: bash
+
+      - name: Lint
+        run: |
+          bash ./lint.sh ${{ env.PACKAGE_NAME }}
+        shell: bash
+
+      - name: Run unit tests
+        if: ${{ !cancelled() }}
+        run: |
+          poetry run python -m pytest tests/
+        shell: bash
+
+      - name: Build
+        if: ${{ !cancelled() }}
+        run: |
+          export NUITKA_CACHE_DIR=$PWD/.nuitka_cache
+          export CCACHE_DIR=$PWD/.ccache
+          poetry run python -m nuitka \
+            --standalone \
+            --follow-imports \
+            --assume-yes-for-downloads \
+            --plugin-enable="pylint-warnings" \
+            --warn-unusual-code \
+            --warn-implicit-exceptions \
+            --show-memory \
+            --show-modules \
+            ${{ matrix.nuitkaArgs }} \
+            ${{ env.PACKAGE_NAME }}/${{ env.MAIN_MODULE }}.py
+          
+          # rename executable
+          mv ${{ env.MAIN_MODULE }}.dist/${{ env.MAIN_MODULE }}${{ matrix.exeExtension }} ${{ env.MAIN_MODULE }}.dist/${{ env.APP_NAME }}${{ matrix.exeExtension }}
+          # rename result dir
+          mv ${{ env.MAIN_MODULE }}.dist ${{ env.APP_NAME }}
+        shell: bash
+      
+      - name: TestRun
+        if: ${{ !cancelled() }}
+        run: |
+          # TODO
+          ./cicdtools_${{ matrix.name }}/cicdtools${{ matrix.exeExtension }} test-run "cicdtools/cicdtools${{ matrix.exeExtension }} file-exists modapp_buildtools/cli.py"
+        shell: bash
+
+      - uses: actions/upload-artifact@v3
+        if: ${{ !cancelled() }}
+        with:
+          name: ${{ env.APP_NAME }}_${{ matrix.name }}
+          path: |
+            ${{ github.workspace }}/${{ env.APP_NAME }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-20.04
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v3
+
+      - name: Archive
+        run: |
+          chmod +x ./cicdtools_Linux/cicdtools
+          ./cicdtools_Linux/cicdtools archive $PWD/${{ env.APP_NAME }}_Linux ${{ env.APP_NAME }}_Linux.zip
+          ./cicdtools_Linux/cicdtools archive $PWD/${{ env.APP_NAME }}_macOS ${{ env.APP_NAME }}_macOS.zip
+          ./cicdtools_Linux/cicdtools archive $PWD/${{ env.APP_NAME }}_Windows ${{ env.APP_NAME }}_Windows.zip
+
+      - uses: "marvinpinto/action-automatic-releases@v1.2.1"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          files: "${{ env.APP_NAME }}_*.zip"
