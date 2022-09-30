@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from os import mkdir, makedirs
 from os.path import relpath
 from shutil import copy, rmtree
+from string import Template
 
 from command_runner import command_runner
 from loguru import logger
@@ -27,7 +28,7 @@ def prepare_output_dir(output_path: Path, app_dir_name: str) -> Path:
             rmtree(res_app_path)
         else:
             res_app_path.unlink()
-    mkdir(res_app_path)
+    makedirs(res_app_path)
     return res_app_path
 
 
@@ -44,7 +45,7 @@ def add_rpath(file_path: Path, new_rpath: str) -> None:
     current_rpath = str(output).strip("\n")
     rpaths = set(current_rpath.split(":"))
     rpaths.add(new_rpath)
-    updated_rpath = ':'.join(rpaths)
+    updated_rpath = ":".join(rpaths)
 
     exit_code, output = command_runner(
         f"patchelf --set-rpath '{updated_rpath}' {str(file_path.absolute())}",
@@ -77,7 +78,7 @@ def handle_libraries(libraries: List[Path], app_path: Path, res_app_path: Path) 
         library_rel_path = library.relative_to(app_path)
         library_res_path = destination / library_rel_path
         makedirs(library_res_path.parent, exist_ok=True)
-        copy(library, destination / library_res_path)
+        copy(library, library_res_path)
 
 
 def handle_other_files(
@@ -117,5 +118,31 @@ def predeploy_app(app_path: Path, output_path: Path, app_dir_name: str = "AppDir
     handle_executables(executables, res_app_path)
     handle_libraries(libraries, app_path, res_app_path)
     handle_other_files(other_files, app_path, res_app_path)
-    # TODO: create icon and .desktop in AppDir
-    # TODO: create AppRun in AppDir
+
+    if len(executables) == 0:
+        raise Exception("No executables found")
+    app_name = executables[0].stem
+
+    # icon
+    icon_src_path = Path(__file__).parent / "resources" / "app.png"
+    # go-appimage requires icon on the same level as AppDir
+    icon_dst_path = output_path / "app.png"
+    copy(icon_src_path, icon_dst_path)
+
+    # .desktop file
+    desktop_file_template_path = Path(__file__).parent / "resources" / "app.desktop"
+    desktop_file_dst_path = (
+        res_app_path / "share" / "applications" / f"{app_name}.desktop"
+    )
+    with open(desktop_file_template_path) as template_file:
+        desktop_template = Template(template_file.read())
+
+    desktop_file_content = desktop_template.safe_substitute(
+        {
+            "name": app_name,
+            "exec": app_name,
+        }
+    )
+    makedirs(desktop_file_dst_path.parent)
+    with open(desktop_file_dst_path, "w") as output_file:
+        output_file.write(desktop_file_content)

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Name=${name}
+Type=Application
+Exec=${exec} %U
+TryExec=${exec}
+Icon=app
+Categories=Development;
