@@ -105,6 +105,7 @@ jobs:
             --warn-implicit-exceptions \
             --show-memory \
             --show-modules \
+            --include-data-dir=${{ env.PACKAGE_NAME }}/resources=${{ env.PACKAGE_NAME }}/resources \
             ${{ matrix.nuitkaArgs }} \
             ${{ env.PACKAGE_NAME }}/${{ env.MAIN_MODULE }}.py
           
