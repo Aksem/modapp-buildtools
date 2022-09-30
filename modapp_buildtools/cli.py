@@ -19,8 +19,8 @@ def check_linking(
 
 
 @app.command()
-def predeploy(app_path: Path, output_path: Path) -> None:
-    predeploy_app(app_path, output_path)
+def predeploy(app_path: Path, output_path: Path, app_dir_name: str = "AppDir") -> None:
+    predeploy_app(app_path, output_path, app_dir_name=app_dir_name)
 
 
 if __name__ == "__main__":
