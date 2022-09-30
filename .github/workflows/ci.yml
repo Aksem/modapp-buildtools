@@ -117,8 +117,7 @@ jobs:
       - name: TestRun
         if: ${{ !cancelled() }}
         run: |
-          # TODO
-          ./cicdtools_${{ matrix.name }}/cicdtools${{ matrix.exeExtension }} test-run "cicdtools/cicdtools${{ matrix.exeExtension }} file-exists modapp_buildtools/cli.py"
+          ./cicdtools_${{ matrix.name }}/cicdtools${{ matrix.exeExtension }} test-run "${{ env.APP_NAME }}/${{ env.APP_NAME }}${{ matrix.exeExtension }} predeploy --help"
         shell: bash
 
       - uses: actions/upload-artifact@v3
