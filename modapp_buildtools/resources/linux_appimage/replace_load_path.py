@@ -8,14 +8,14 @@ STRING_TO_REPLACE = (
     " sizeof(filename));"
 )
 NEW_STRING = """        appendStringSafe(filename, getBinaryDirectoryHostEncoded(), sizeof(filename));
-        // new code
+        // new code: buildtools-1
         appendCharSafe(filename, SEP, sizeof(filename));
         appendStringSafe(filename, "..", sizeof(filename));
         appendCharSafe(filename, SEP, sizeof(filename));
         appendStringSafe(filename, "usr", sizeof(filename));
         appendCharSafe(filename, SEP, sizeof(filename));
         appendStringSafe(filename, "lib", sizeof(filename));
-        // new code end
+        // new code end: buildtools-1
 """
 
 
@@ -25,7 +25,8 @@ def replace_load_path():
     with open(src_file_path, "r") as src_file:
         src = src_file.read()
 
-    src = src.replace(STRING_TO_REPLACE, NEW_STRING)
+    if "// new code: buildtools-1" not in src:
+        src = src.replace(STRING_TO_REPLACE, NEW_STRING)
 
     with open(src_file_path, "w") as src_file:
         src_file.write(src)
